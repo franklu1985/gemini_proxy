@@ -36,11 +36,16 @@ cd gemini_proxy
 2. 点击 **添加Python项目**
 3. 配置如下：
    - **项目名称**: `gemini_proxy`
-   - **Python版本**: `3.8+`
+   - **Python版本**: `3.8+` (推荐3.10+)
    - **项目路径**: `/www/wwwroot/gemini_proxy`
-   - **启动文件**: `start_production.py`
+   - **启动文件**: `wsgi.py` (使用新的WSGI入口)
    - **启动方式**: `Gunicorn`
    - **端口**: `8000`
+   - **虚拟环境**: 自动创建 (推荐)
+
+**重要**: 宝塔面板会自动为项目创建虚拟环境，路径通常为：
+- `/www/server/pyproject_evn/gemini_proxy_venv/`
+- 或 `/www/server/pyproject_envs/gemini_proxy_venv/`
 
 ### 第三步：安装依赖
 
@@ -104,7 +109,11 @@ chown -R www:www /www/wwwroot/gemini_proxy/logs
    - **启动用户**: `www`
    - **启动命令**: 
      ```bash
-     /www/server/python/3.8/bin/gunicorn --config /www/wwwroot/gemini_proxy/gunicorn.conf.py start_production:application
+     # 使用虚拟环境 (自动检测路径)
+     /www/wwwroot/gemini_proxy/bt_service.sh start
+     
+     # 或者手动指定虚拟环境路径
+     /www/server/pyproject_evn/gemini_proxy_venv/bin/gunicorn --config /www/wwwroot/gemini_proxy/bt_gunicorn.conf.py wsgi:application
      ```
    - **进程目录**: `/www/wwwroot/gemini_proxy`
 
@@ -268,9 +277,34 @@ location /redoc {
 
 ## 🚨 故障排除
 
+### 快速诊断工具
+
+首先运行我们的诊断脚本：
+```bash
+cd /www/wwwroot/gemini_proxy
+python diagnose.py
+```
+
 ### 常见问题
 
-1. **服务无法启动**
+1. **Gunicorn Worker启动失败**
+   ```bash
+   # 问题特征：Exception in worker process, self.callable = self.load()
+   
+   # 解决方案1：使用专用配置文件
+   ./bt_service.sh stop
+   cp bt_gunicorn.conf.py gunicorn.conf.py  # 使用宝塔专用配置
+   ./bt_service.sh start
+   
+   # 解决方案2：检查WSGI入口
+   python wsgi.py  # 测试WSGI应用是否能正常加载
+   
+   # 解决方案3：检查Python路径
+   which python
+   /www/server/python/3.8/bin/python --version
+   ```
+
+2. **服务无法启动**
    ```bash
    # 检查Python环境
    /www/server/python/3.8/bin/python --version

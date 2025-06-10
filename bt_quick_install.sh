@@ -9,8 +9,8 @@ echo "==========================================="
 APP_NAME="gemini_proxy"
 WEB_ROOT="/www/wwwroot"
 APP_PATH="$WEB_ROOT/$APP_NAME"
-PYTHON_VERSION="3.8"  # 可根据需要修改
-PYTHON_PATH="/www/server/python/$PYTHON_VERSION/bin"
+PYTHON_VERSION=""  # 将自动检测
+PYTHON_PATH=""     # 将自动检测虚拟环境路径
 
 # 颜色定义
 RED='\033[0;31m'
@@ -56,34 +56,88 @@ check_bt_panel() {
     log_success "宝塔面板已安装"
 }
 
+# 检测宝塔面板虚拟环境
+detect_bt_python_env() {
+    # 宝塔面板虚拟环境可能的路径
+    local venv_paths=(
+        "/www/server/pyproject_evn/${APP_NAME}_venv/bin"
+        "/www/server/pyproject_envs/${APP_NAME}_venv/bin"
+        "/www/pyproject_envs/${APP_NAME}_venv/bin"
+        "/www/server/python_venv/${APP_NAME}_venv/bin"
+        "$APP_PATH/venv/bin"
+        "$APP_PATH/.venv/bin"
+    )
+    
+    for venv_path in "${venv_paths[@]}"; do
+        if [ -x "$venv_path/python" ]; then
+            echo "$venv_path"
+            return 0
+        fi
+    done
+    
+    # 如果找不到虚拟环境，尝试系统Python
+    for version in 3.12 3.11 3.10 3.9 3.8; do
+        local sys_path="/www/server/python/$version/bin"
+        if [ -x "$sys_path/python" ]; then
+            echo "$sys_path"
+            PYTHON_VERSION=$version
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
 # 检查Python环境
 check_python() {
     log_info "检查Python环境..."
-    if [ ! -x "$PYTHON_PATH/python" ]; then
-        log_warning "Python $PYTHON_VERSION 未安装"
-        log_info "请在宝塔面板 -> 软件商店 -> 运行环境 中安装 Python $PYTHON_VERSION"
+    
+    PYTHON_PATH=$(detect_bt_python_env)
+    
+    if [ -z "$PYTHON_PATH" ]; then
+        log_warning "未找到Python虚拟环境或系统Python"
+        log_info "请先在宝塔面板中配置Python环境："
+        log_info "1. 进入 '软件商店' -> '运行环境' -> 安装Python"
+        log_info "2. 进入 'Python项目管理器' -> '添加Python项目'"
+        log_info "3. 设置项目路径为: $APP_PATH"
         
-        # 尝试查找其他Python版本
-        for version in 3.9 3.10 3.11 3.12; do
+        # 尝试引导用户选择Python版本
+        log_info "或者，现在为您检查可用的Python版本..."
+        for version in 3.12 3.11 3.10 3.9 3.8; do
             if [ -x "/www/server/python/$version/bin/python" ]; then
-                log_info "发现Python $version，是否使用？(y/n)"
-                read -r use_version
-                if [ "$use_version" = "y" ] || [ "$use_version" = "Y" ]; then
+                log_info "发现Python $version，是否创建虚拟环境？(y/n)"
+                read -r create_venv
+                if [ "$create_venv" = "y" ] || [ "$create_venv" = "Y" ]; then
                     PYTHON_VERSION=$version
                     PYTHON_PATH="/www/server/python/$version/bin"
+                    
+                    # 创建虚拟环境
+                    log_info "为项目创建虚拟环境..."
+                    $PYTHON_PATH/python -m venv "$APP_PATH/venv"
+                    PYTHON_PATH="$APP_PATH/venv/bin"
+                    log_success "虚拟环境创建成功: $PYTHON_PATH"
                     break
                 fi
             fi
         done
         
-        if [ ! -x "$PYTHON_PATH/python" ]; then
-            log_error "未找到可用的Python版本"
+        if [ -z "$PYTHON_PATH" ]; then
+            log_error "未找到可用的Python版本或虚拟环境"
+            log_error "请在宝塔面板中正确配置Python环境后重试"
             exit 1
         fi
     fi
     
     PYTHON_VER=$($PYTHON_PATH/python --version 2>&1)
     log_success "Python环境检查通过: $PYTHON_VER"
+    log_info "Python路径: $PYTHON_PATH"
+    
+    # 检查是否为虚拟环境
+    if echo "$PYTHON_PATH" | grep -q "venv\|envs"; then
+        log_success "使用虚拟环境: 是"
+    else
+        log_warning "使用虚拟环境: 否 (建议使用虚拟环境)"
+    fi
 }
 
 # 创建项目目录

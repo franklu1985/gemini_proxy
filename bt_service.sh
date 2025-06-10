@@ -4,11 +4,49 @@
 
 APP_NAME="gemini_proxy"
 APP_PATH="/www/wwwroot/gemini_proxy"
-PYTHON_PATH="/www/server/python/3.8/bin"  # 根据实际Python版本调整
+
+# 自动检测宝塔面板虚拟环境路径
+detect_python_env() {
+    # 宝塔面板虚拟环境可能的路径
+    local venv_paths=(
+        "/www/server/pyproject_evn/gemini_proxy_venv/bin"
+        "/www/server/pyproject_envs/gemini_proxy_venv/bin"
+        "/www/pyproject_envs/gemini_proxy_venv/bin"
+        "/www/server/python_venv/gemini_proxy_venv/bin"
+        "$APP_PATH/venv/bin"
+        "$APP_PATH/.venv/bin"
+    )
+    
+    for venv_path in "${venv_paths[@]}"; do
+        if [ -x "$venv_path/python" ]; then
+            echo "$venv_path"
+            return 0
+        fi
+    done
+    
+    # 如果找不到虚拟环境，尝试系统Python
+    for version in 3.12 3.11 3.10 3.9 3.8; do
+        local sys_path="/www/server/python/$version/bin"
+        if [ -x "$sys_path/python" ]; then
+            echo "$sys_path"
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+PYTHON_PATH=$(detect_python_env)
+if [ -z "$PYTHON_PATH" ]; then
+    echo "❌ 未找到可用的Python环境"
+    echo "请检查宝塔面板是否已创建Python项目虚拟环境"
+    exit 1
+fi
+
 PID_FILE="$APP_PATH/logs/gunicorn.pid"
 LOG_FILE="$APP_PATH/logs/error.log"
-CONFIG_FILE="$APP_PATH/gunicorn.conf.py"
-APP_MODULE="start_production:application"
+CONFIG_FILE="$APP_PATH/bt_gunicorn.conf.py"
+APP_MODULE="wsgi:application"
 
 # 检查是否在正确目录
 if [ ! -d "$APP_PATH" ]; then
@@ -178,10 +216,26 @@ logs() {
 check_env() {
     echo "🔍 检查运行环境..."
     
+    # 重新检测Python环境
+    PYTHON_PATH=$(detect_python_env)
+    if [ -z "$PYTHON_PATH" ]; then
+        echo "❌ 未找到可用的Python环境"
+        echo "💡 请在宝塔面板 -> Python项目管理器 中创建项目"
+        return 1
+    fi
+    
     # 检查Python版本
     if [ -x "$PYTHON_PATH/python" ]; then
         PYTHON_VERSION=$($PYTHON_PATH/python --version 2>&1)
         echo "✅ Python: $PYTHON_VERSION"
+        echo "📁 Python路径: $PYTHON_PATH"
+        
+        # 检查是否为虚拟环境
+        if echo "$PYTHON_PATH" | grep -q "venv\|envs"; then
+            echo "🌍 虚拟环境: 是"
+        else
+            echo "🌍 虚拟环境: 否 (使用系统Python)"
+        fi
     else
         echo "❌ Python不存在: $PYTHON_PATH/python"
         echo "请检查宝塔面板Python安装"
@@ -253,6 +307,16 @@ install_deps() {
     fi
 }
 
+diagnose() {
+    echo "🔍 运行诊断脚本..."
+    if [ -f "$APP_PATH/diagnose.py" ]; then
+        $PYTHON_PATH/python diagnose.py
+    else
+        echo "❌ 诊断脚本不存在: diagnose.py"
+        return 1
+    fi
+}
+
 case "$1" in
     start)
         start
@@ -275,19 +339,23 @@ case "$1" in
     install)
         install_deps
         ;;
+    diagnose)
+        diagnose
+        ;;
     *)
         echo "宝塔面板 Gemini代理服务管理脚本"
         echo ""
-        echo "用法: $0 {start|stop|restart|status|logs|check|install}"
+        echo "用法: $0 {start|stop|restart|status|logs|check|install|diagnose}"
         echo ""
         echo "命令说明:"
-        echo "  start   - 启动服务"
-        echo "  stop    - 停止服务"
-        echo "  restart - 重启服务"
-        echo "  status  - 查看服务状态"
-        echo "  logs    - 查看服务日志"
-        echo "  check   - 检查运行环境"
-        echo "  install - 安装Python依赖"
+        echo "  start    - 启动服务"
+        echo "  stop     - 停止服务"
+        echo "  restart  - 重启服务"
+        echo "  status   - 查看服务状态"
+        echo "  logs     - 查看服务日志"
+        echo "  check    - 检查运行环境"
+        echo "  install  - 安装Python依赖"
+        echo "  diagnose - 运行完整诊断"
         echo ""
         echo "示例:"
         echo "  $0 start     # 启动服务"
