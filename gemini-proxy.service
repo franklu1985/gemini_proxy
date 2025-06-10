@@ -1,0 +1,26 @@
+[Unit]
+Description=Gemini Proxy Service
+After=network.target
+
+[Service]
+Type=forking
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/gemini_proxy
+Environment="PATH=/path/to/gemini_proxy/venv/bin"
+ExecStart=/path/to/gemini_proxy/venv/bin/gunicorn --config gunicorn.conf.py --daemon start_production:application
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s QUIT $MAINPID
+PIDFile=/path/to/gemini_proxy/logs/gunicorn.pid
+Restart=on-failure
+RestartSec=5
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/path/to/gemini_proxy/audio_output /path/to/gemini_proxy/logs
+
+[Install]
+WantedBy=multi-user.target 

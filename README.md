@@ -15,18 +15,57 @@
 
 ## 🚀 快速开始
 
-### 1. 环境要求
+### 生产环境部署（推荐）
+
+#### 宝塔面板一键部署 ⭐
+
+如果您使用Ubuntu系统 + 宝塔面板，推荐使用我们的一键部署方案：
+
+```bash
+# 一键部署脚本
+bash bt_quick_install.sh
+
+# 服务管理
+./bt_service.sh start
+./bt_service.sh status
+./bt_service.sh logs
+```
+
+**优势**：
+- 🚀 自动环境检测和配置
+- 🎛️ 宝塔面板图形化管理
+- 🌐 自动Nginx反向代理
+- 📊 实时监控和日志
+- 🔒 SSL证书自动申请
+
+**详细指南**：[宝塔面板部署文档](bt_deploy.md)
+
+#### 传统Linux部署
+
+```bash
+# 部署脚本
+./deploy.sh
+
+# 服务管理 
+./service.sh start
+```
+
+**详细指南**：[生产环境部署文档](DEPLOYMENT.md)
+
+### 开发环境
+
+#### 1. 环境要求
 
 - Python 3.8+
 - Google Gemini API Key
 
-### 2. 安装依赖
+#### 2. 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. 配置环境
+#### 3. 配置环境
 
 创建 `.env` 文件并设置 API 密钥：
 
@@ -36,7 +75,7 @@ HOST=0.0.0.0
 PORT=8000
 ```
 
-### 4. 启动服务
+#### 4. 启动服务
 
 ```bash
 python main.py
@@ -44,7 +83,7 @@ python main.py
 
 服务将在 `http://localhost:8000` 启动。
 
-### 5. 测试服务
+#### 5. 测试服务
 
 ```bash
 python test_client.py
